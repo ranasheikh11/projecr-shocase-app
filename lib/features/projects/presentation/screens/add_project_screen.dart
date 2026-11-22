@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/project_bloc.dart';
 import '../bloc/project_event.dart';
 import '../bloc/project_state.dart';
+import 'form_widgets.dart';
 
 class AddProjectScreen extends StatelessWidget {
   const AddProjectScreen({super.key});
@@ -15,10 +17,23 @@ class AddProjectScreen extends StatelessWidget {
     return BlocListener<ProjectBloc, ProjectState>(
       listener: (context, state) {
         if (state is ProjectCreated) {
+          HapticFeedback.heavyImpact();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Project created successfully! 🎉'),
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.celebration_rounded,
+                      color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text('Project published to your portfolio!',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
               backgroundColor: AppTheme.successColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
             ),
           );
           Navigator.pop(context);
@@ -27,6 +42,10 @@ class AddProjectScreen extends StatelessWidget {
             SnackBar(
               content: Text(state.message),
               backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
             ),
           );
         }
@@ -43,370 +62,383 @@ class _AddProjectForm extends StatefulWidget {
   State<_AddProjectForm> createState() => _AddProjectFormState();
 }
 
-class _AddProjectFormState extends State<_AddProjectForm> {
+class _AddProjectFormState extends State<_AddProjectForm>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _detailsController = TextEditingController();
-  final _googlePlayStoreController = TextEditingController();
-  final _appleAppStoreController = TextEditingController();
-  final _githubController = TextEditingController();
-  final List<File> _selectedImages = [];
-  final ImagePicker _picker = ImagePicker();
+  final _nameCtrl = TextEditingController();
+  final _detailsCtrl = TextEditingController();
+  final _playStoreCtrl = TextEditingController();
+  final _appStoreCtrl = TextEditingController();
+  final _githubCtrl = TextEditingController();
+  final List<File> _images = [];
+  final _picker = ImagePicker();
+
+  late final List<AnimationController> _sectionCtrl;
+  late final List<Animation<Offset>> _slideAnims;
+  late final List<Animation<double>> _fadeAnims;
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _detailsController.dispose();
-    _googlePlayStoreController.dispose();
-    _appleAppStoreController.dispose();
-    _githubController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImages() async {
-    final List<XFile> files = await _picker.pickMultiImage(
-      imageQuality: 85,
+  void initState() {
+    super.initState();
+    // 4 sections: Info, Links, Images, Button
+    _sectionCtrl = List.generate(
+      4,
+      (i) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 480),
+      ),
     );
-    if (files.isNotEmpty) {
-      setState(() {
-        _selectedImages.addAll(files.map((f) => File(f.path)));
+    _slideAnims = _sectionCtrl
+        .map((c) => Tween<Offset>(
+              begin: const Offset(0, 0.18),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: c, curve: Curves.easeOut)))
+        .toList();
+    _fadeAnims = _sectionCtrl
+        .map((c) => Tween<double>(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(parent: c, curve: Curves.easeOut),
+            ))
+        .toList();
+
+    // Staggered entry — each section 110ms after the previous
+    for (int i = 0; i < _sectionCtrl.length; i++) {
+      Future.delayed(Duration(milliseconds: 80 + i * 110), () {
+        if (mounted) _sectionCtrl[i].forward();
       });
     }
   }
 
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _detailsCtrl.dispose();
+    _playStoreCtrl.dispose();
+    _appStoreCtrl.dispose();
+    _githubCtrl.dispose();
+    for (final c in _sectionCtrl) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    final files = await _picker.pickMultiImage(imageQuality: 85);
+    if (files.isNotEmpty) {
+      setState(() => _images.addAll(files.map((f) => File(f.path))));
+      HapticFeedback.selectionClick();
+    }
+  }
+
   void _removeImage(int index) {
-    setState(() => _selectedImages.removeAt(index));
+    HapticFeedback.lightImpact();
+    setState(() => _images.removeAt(index));
   }
 
   void _submit() {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedImages.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select at least one image'),
-            backgroundColor: AppTheme.errorColor,
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.vibrate();
+      return;
+    }
+    if (_images.isEmpty) {
+      HapticFeedback.vibrate();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.photo_library_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Please add at least one screenshot',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    context.read<ProjectBloc>().add(
+          CreateProjectEvent(
+            name: _nameCtrl.text.trim(),
+            details: _detailsCtrl.text.trim(),
+            googlePlayStore: _playStoreCtrl.text.trim(),
+            appleAppStore: _appStoreCtrl.text.trim(),
+            github: _githubCtrl.text.trim(),
+            images: _images,
           ),
         );
-        return;
-      }
-      context.read<ProjectBloc>().add(
-            CreateProjectEvent(
-              name: _nameController.text.trim(),
-              details: _detailsController.text.trim(),
-              googlePlayStore: _googlePlayStoreController.text.trim(),
-              appleAppStore: _appleAppStoreController.text.trim(),
-              github: _githubController.text.trim(),
-              images: _selectedImages,
-            ),
-          );
-    }
+  }
+
+  Widget _animated(int index, Widget child) {
+    return FadeTransition(
+      opacity: _fadeAnims[index],
+      child: SlideTransition(
+        position: _slideAnims[index],
+        child: child,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
-      appBar: AppBar(
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.bgCard,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.dividerColor),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 16, color: AppTheme.textPrimary),
-          ),
-        ),
-        title: const Text('Add New Project'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: AppTheme.dividerColor),
-        ),
-      ),
+      appBar: buildFormAppBar(context, 'New Project'),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
           children: [
-            _buildSectionTitle(context, 'Project Info', Icons.info_outline_rounded),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _nameController,
-              label: 'Project Name',
-              hint: 'e.g. My Portfolio App',
-              icon: Icons.title_rounded,
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Name is required' : null,
+            // ── Progress stepper ─────────────────────────────────────
+            _animated(0, const _StepProgressBar()),
+            const SizedBox(height: 28),
+
+            // ── Project Info ──────────────────────────────────────────
+            _animated(
+              0,
+              FormSectionHeader(
+                icon: Icons.edit_note_rounded,
+                title: 'Project Info',
+                subtitle: 'Give your project a name and a good description',
+              ),
             ),
             const SizedBox(height: 16),
-            _buildTextField(
-              controller: _detailsController,
-              label: 'Project Description',
-              hint: 'Describe what this project does...',
-              icon: Icons.description_outlined,
-              maxLines: 4,
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Description is required' : null,
+            _animated(
+              0,
+              AppTextField(
+                controller: _nameCtrl,
+                label: 'Project Name',
+                hint: 'e.g. Sable Dreams App',
+                icon: Icons.title_rounded,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Name is required' : null,
+                onChanged: (_) => setState(() {}),
+              ),
             ),
-            const SizedBox(height: 32),
-            _buildSectionTitle(
-                context, 'Links', Icons.link_rounded),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _googlePlayStoreController,
-              label: 'Google Play Store URL',
-              hint: 'https://play.google.com/...',
-              icon: Icons.shop_rounded,
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _appleAppStoreController,
-              label: 'Apple App Store URL',
-              hint: 'https://apps.apple.com/...',
-              icon: Icons.shop_rounded,
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 16),
-            _buildTextField(
-              controller: _githubController,
-              label: 'GitHub URL',
-              hint: 'https://github.com/username/repo',
-              icon: Icons.code_rounded,
-              keyboardType: TextInputType.url,
+            const SizedBox(height: 14),
+            _animated(
+              0,
+              AppTextField(
+                controller: _detailsCtrl,
+                label: 'Description',
+                hint: 'What does this project do? Who is it for?',
+                icon: Icons.notes_rounded,
+                maxLines: 5,
+                maxLength: 500,
+                showCounter: true,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty
+                        ? 'Description is required'
+                        : null,
+                onChanged: (_) => setState(() {}),
+              ),
             ),
             const SizedBox(height: 32),
-            _buildSectionTitle(
-                context, 'Project Images', Icons.photo_library_rounded),
+
+            // ── Links ─────────────────────────────────────────────────
+            _animated(
+              1,
+              FormSectionHeader(
+                icon: Icons.link_rounded,
+                title: 'Store & Repo Links',
+                subtitle: 'At least one link helps recruiters find your work',
+              ),
+            ),
             const SizedBox(height: 16),
-            _buildImagePicker(context),
-            const SizedBox(height: 40),
-            BlocBuilder<ProjectBloc, ProjectState>(
-              builder: (context, state) {
-                final isLoading = state is ProjectActionLoading;
-                return _buildSubmitButton(context, isLoading);
-              },
+            _animated(
+              1,
+              AppTextField(
+                controller: _playStoreCtrl,
+                label: 'Google Play Store',
+                hint: 'https://play.google.com/...',
+                icon: Icons.shop_rounded,
+                keyboardType: TextInputType.url,
+                isUrlField: true,
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _animated(
+              1,
+              AppTextField(
+                controller: _appStoreCtrl,
+                label: 'Apple App Store',
+                hint: 'https://apps.apple.com/...',
+                icon: Icons.apple_rounded,
+                keyboardType: TextInputType.url,
+                isUrlField: true,
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _animated(
+              1,
+              AppTextField(
+                controller: _githubCtrl,
+                label: 'GitHub Repository',
+                hint: 'https://github.com/username/repo',
+                icon: Icons.code_rounded,
+                keyboardType: TextInputType.url,
+                isUrlField: true,
+                onChanged: (_) => setState(() {}),
+              ),
             ),
             const SizedBox(height: 32),
+
+            // ── Images ────────────────────────────────────────────────
+            _animated(
+              2,
+              FormSectionHeader(
+                icon: Icons.photo_library_rounded,
+                title: 'Screenshots',
+                subtitle: 'Upload at least one screenshot — more is better!',
+              ),
+            ),
+            const SizedBox(height: 16),
+            _animated(
+              2,
+              ImagePickerSection(
+                images: _images,
+                onAdd: _pickImages,
+                onRemove: _removeImage,
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // ── Warm hint ─────────────────────────────────────────────
+            _animated(
+              3,
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome_rounded,
+                        color: AppTheme.primaryLight.withValues(alpha: 0.8),
+                        size: 16),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Your project will appear in your portfolio right away after publishing.',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12.5,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Submit ────────────────────────────────────────────────
+            _animated(
+              3,
+              BlocBuilder<ProjectBloc, ProjectState>(
+                builder: (context, state) {
+                  return SubmitButton(
+                    label: 'Publish to Portfolio',
+                    loadingLabel: 'Publishing...',
+                    icon: Icons.rocket_launch_rounded,
+                    isLoading: state is ProjectActionLoading,
+                    onTap: _submit,
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildSectionTitle(
-      BuildContext context, String title, IconData icon) {
+// ─── Step progress bar ────────────────────────────────────────────────────────
+class _StepProgressBar extends StatelessWidget {
+  const _StepProgressBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      (Icons.edit_note_rounded, 'Info'),
+      (Icons.link_rounded, 'Links'),
+      (Icons.photo_library_rounded, 'Images'),
+      (Icons.rocket_launch_rounded, 'Publish'),
+    ];
     return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: AppTheme.primaryLight, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: AppTheme.textPrimary),
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: AppTheme.textHint, size: 20),
-      ),
-    );
-  }
-
-  Widget _buildImagePicker(BuildContext context) {
-    return Column(
-      children: [
-        // Image Grid
-        if (_selectedImages.isNotEmpty) ...[
-          SizedBox(
-            height: 110,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _selectedImages.length,
-              separatorBuilder: (a, b) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                return Stack(
+      children: steps.asMap().entries.map((e) {
+        final i = e.key;
+        final step = e.value;
+        final isLast = i == steps.length - 1;
+        return Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        _selectedImages[index],
-                        width: 100,
-                        height: 110,
-                        fit: BoxFit.cover,
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(9),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(step.$1, color: Colors.white, size: 15),
                       ),
                     ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: GestureDetector(
-                        onTap: () => _removeImage(index),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.errorColor,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close,
-                              color: Colors.white, size: 12),
-                        ),
+                    const SizedBox(height: 5),
+                    Text(
+                      step.$2,
+                      style: const TextStyle(
+                        color: AppTheme.textHint,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // Add Image Button
-        GestureDetector(
-          onTap: _pickImages,
-          child: Container(
-            height: 100,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppTheme.bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                style: BorderStyle.solid,
-                width: 1.5,
+                ),
               ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.add_photo_alternate_outlined,
-                  color: AppTheme.primaryLight,
-                  size: 32,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _selectedImages.isEmpty
-                      ? 'Tap to add images'
-                      : 'Add more images',
-                  style: TextStyle(
-                    color: AppTheme.primaryLight,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                ),
-                if (_selectedImages.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_selectedImages.length} image(s) selected',
-                    style: const TextStyle(
-                      color: AppTheme.textHint,
-                      fontSize: 12,
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryColor.withValues(alpha: 0.5),
+                          AppTheme.primaryColor.withValues(alpha: 0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSubmitButton(BuildContext context, bool isLoading) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: isLoading ? null : AppTheme.primaryGradient,
-        color: isLoading ? AppTheme.bgCard : null,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: isLoading
-            ? null
-            : [
-                BoxShadow(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  spreadRadius: 2,
                 ),
-              ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: isLoading ? null : _submit,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: isLoading
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.primaryLight,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Text(
-                          'Creating Project...',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_circle_outline_rounded,
-                            color: Colors.white),
-                        SizedBox(width: 10),
-                        Text(
-                          'Create Project',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
+            ],
           ),
-        ),
-      ),
+        );
+      }).toList(),
     );
   }
 }

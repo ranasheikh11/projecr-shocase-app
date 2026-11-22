@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/theme/app_theme.dart';
@@ -9,7 +10,8 @@ import 'features/projects/presentation/screens/projects_list_screen.dart';
 import 'injection_container.dart' as di;
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // Set status bar style
   SystemChrome.setSystemUIOverlayStyle(
@@ -27,6 +29,8 @@ void main() async {
   // Initialize dependencies
   await di.initDependencies();
 
+  FlutterNativeSplash.remove();
+
   runApp(const PortfolioAdminApp());
 }
 
@@ -38,7 +42,7 @@ class PortfolioAdminApp extends StatelessWidget {
     return BlocProvider<ProjectBloc>(
       create: (_) => di.sl<ProjectBloc>(),
       child: MaterialApp(
-        title: 'DevUpload',
+        title: 'AppFolio',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const ProjectsListScreen(),

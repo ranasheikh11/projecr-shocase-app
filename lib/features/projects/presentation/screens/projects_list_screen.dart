@@ -276,76 +276,171 @@ class _ProjectCard extends StatelessWidget {
   Widget _buildImageSection(BuildContext context) {
     if (project.images.isEmpty) {
       return Container(
-        height: 160,
+        height: 180,
         decoration: const BoxDecoration(
           color: AppTheme.bgCardLight,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: const Center(
-          child: Icon(
-            Icons.image_outlined,
-            color: AppTheme.textHint,
-            size: 48,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.phone_android_rounded, color: AppTheme.textHint, size: 40),
+              SizedBox(height: 8),
+              Text('No screenshots', style: TextStyle(color: AppTheme.textHint, fontSize: 12)),
+            ],
           ),
         ),
       );
     }
 
+    final images = project.images;
+    final showCount = images.length.clamp(1, 3);
+
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      child: Stack(
-        children: [
-          CachedNetworkImage(
-            imageUrl: project.images.first,
-            height: 180,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              height: 180,
-              color: AppTheme.bgCardLight,
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: AppTheme.primaryColor,
-                  strokeWidth: 2,
+      child: Container(
+        height: 220,
+        width: double.infinity,
+        color: const Color(0xFF0D0D18),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.8,
+                    colors: [
+                      AppTheme.primaryColor.withValues(alpha: 0.12),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
             ),
-            errorWidget: (context, url, error) => Container(
-              height: 180,
-              color: AppTheme.bgCardLight,
-              child: const Icon(Icons.broken_image, color: AppTheme.textHint),
-            ),
-          ),
-          if (project.images.length > 1)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.photo_library_rounded,
-                        color: Colors.white, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+${project.images.length - 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: List.generate(showCount, (i) {
+                final isCenter = showCount == 1 || i == showCount ~/ 2;
+                final scale = isCenter ? 1.0 : 0.84;
+                final double offsetX = showCount <= 1
+                    ? 0.0
+                    : (i == 0 ? 8.0 : i == showCount - 1 ? -8.0 : 0.0);
+                return Transform.translate(
+                  offset: Offset(offsetX, 0),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      width: 95,
+                      height: 195,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A2E),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isCenter ? const Color(0xFF4A4A6A) : const Color(0xFF2A2A45),
+                          width: 1.8,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            blurRadius: isCenter ? 16 : 8,
+                            offset: const Offset(0, 6),
+                          ),
+                          if (isCenter)
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                              blurRadius: 16,
+                              spreadRadius: 1,
+                            ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6.2),
+                        child: Stack(
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: images[i],
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(color: const Color(0xFF13131A)),
+                              errorWidget: (_, __, ___) => Container(
+                                color: const Color(0xFF13131A),
+                                child: const Center(
+                                  child: Icon(Icons.broken_image_outlined, color: AppTheme.textHint, size: 20),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.5),
+                                      Colors.transparent,
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 24,
+                                    height: 2.5,
+                                    margin: const EdgeInsets.only(top: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.45),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
+                  ),
+                );
+              }),
+            ),
+            if (images.length > 3)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.photo_library_rounded, color: Colors.white, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        '+${images.length - showCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

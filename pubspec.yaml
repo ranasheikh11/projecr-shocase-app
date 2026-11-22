@@ -34,6 +34,7 @@ dependencies:
   # Utilities
   path_provider: ^2.1.4
   google_fonts: ^6.2.1
+  flutter_native_splash: ^2.4.8
 
 dev_dependencies:
   flutter_test:
@@ -49,11 +50,13 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/app_logo.png"
+  image_path: "assets/images/app_logo_new.png"
   min_sdk_android: 21
 
 flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/app_logo.png
+    - assets/images/
+    - assets/images/splash_logo.png
+    - assets/images/splash_logo.png
